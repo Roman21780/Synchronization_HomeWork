@@ -1,11 +1,10 @@
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap; // Потокобезопасная мапа
 import java.util.concurrent.ExecutorService;   // Управление потоками
 import java.util.concurrent.Executors;          // Фабрика потоков
 import java.util.concurrent.TimeUnit;           // Единицы времени
 
 public class RobotRouteAnalyzerWithLeader {
-    public static final Map<Integer, Integer> sizeToFreq = new ConcurrentHashMap<>();
+    public static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
     private static final Object monitor = new Object();
     private static volatile boolean running = true; // Флаг работы потока-лидера
 
@@ -39,8 +38,10 @@ public class RobotRouteAnalyzerWithLeader {
                 String route = generateRoute("RLRFR", 100);
                 int rCount = countChar(route, 'R');
 
-                // Атомарное обновление статистики
-                sizeToFreq.merge(rCount, 1, Integer::sum);
+                // Все операции с sizeToFreq в synchronized блоке
+                synchronized (sizeToFreq) {
+                    sizeToFreq.put(rCount, sizeToFreq.getOrDefault(rCount, 0) + 1);
+                }
 
                 // Уведомляем поток вывода лидера
                 synchronized (monitor) {
@@ -95,26 +96,29 @@ public class RobotRouteAnalyzerWithLeader {
     }
 
     private static void printStatistics() {
-        if (sizeToFreq.isEmpty()) {
-            System.out.println("Нет данных для статистики");
-            return;
+        // Доступ к sizeToFreq только в synchronized блоке
+        synchronized (sizeToFreq) {
+            if (sizeToFreq.isEmpty()) {
+                System.out.println("Нет данных для статистики");
+                return;
+            }
+
+            // Находим наиболее часто встречающуюся частоту
+            Map.Entry<Integer, Integer> maxEntry = Collections.max(
+                    sizeToFreq.entrySet(),
+                    Map.Entry.comparingByValue()
+            );
+
+            System.out.println("\nСамое частое количество повторений " +
+                    maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
+
+            // Выводим остальные значения, исключая максимальное
+            System.out.println("Другие размеры:");
+            sizeToFreq.entrySet().stream()
+                    .filter(entry -> !entry.equals(maxEntry)) // Исключаем лидера
+                    .sorted(Map.Entry.comparingByKey())         // Сортировка по ключу
+                    .forEach(entry ->                           // Вывод каждого элемента
+                            System.out.println("- " + entry.getKey() + " (" + entry.getValue() + " раз)"));
         }
-
-        // Находим наиболее часто встречающуюся частоту
-        Map.Entry<Integer, Integer> maxEntry = Collections.max(
-                sizeToFreq.entrySet(),
-                Map.Entry.comparingByValue()
-        );
-
-        System.out.println("\nСамое частое количество повторений " +
-                maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
-
-        // Выводим остальные значения, исключая максимальное
-        System.out.println("Другие размеры:");
-        sizeToFreq.entrySet().stream()
-                .filter(entry -> !entry.equals(maxEntry)) // Исключаем лидера
-                .sorted(Map.Entry.comparingByKey())         // Сортировка по ключу
-                .forEach(entry ->                           // Вывод каждого элемента
-                        System.out.println("- " + entry.getKey() + " (" + entry.getValue() + " раз)"));
     }
 }
