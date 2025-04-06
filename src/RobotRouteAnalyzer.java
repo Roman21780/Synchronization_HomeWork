@@ -56,26 +56,29 @@ public class RobotRouteAnalyzer {
 
     // Вывод статистики
     private static void printStatistics() {
-        if (sizeToFreq.isEmpty()) {
-            System.out.println("Нет данных для статистики");
-            return;
+        // Доступ к sizeToFreq только в synchronized блоке
+        synchronized (sizeToFreq) {
+            if (sizeToFreq.isEmpty()) {
+                System.out.println("Нет данных для статистики");
+                return;
+            }
+
+            // Находим запись с максимальным значением
+            Map.Entry<Integer, Integer> maxEntry = Collections.max(
+                    sizeToFreq.entrySet(),
+                    Map.Entry.comparingByValue()
+            );
+
+            System.out.println("Самое частое количество повторений " +
+                    maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
+
+            // Выводим остальные значения, исключая максимальное
+            System.out.println("Другие размеры:");
+            sizeToFreq.entrySet().stream()
+                    .filter(entry -> !entry.equals(maxEntry)) // Исключаем максимальную запись
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry ->
+                            System.out.println("- " + entry.getKey() + " (" + entry.getValue() + " раз)"));
         }
-
-        // Находим запись с максимальным значением
-        Map.Entry<Integer, Integer> maxEntry = Collections.max(
-                sizeToFreq.entrySet(),
-                Map.Entry.comparingByValue()
-        );
-
-        System.out.println("Самое частое количество повторений " +
-                maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
-
-        // Выводим остальные значения, исключая максимальное
-        System.out.println("Другие размеры:");
-        sizeToFreq.entrySet().stream()
-                .filter(entry -> !entry.equals(maxEntry)) // Исключаем максимальную запись
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(entry ->
-                        System.out.println("- " + entry.getKey() + " (" + entry.getValue() + " раз)"));
     }
 }
